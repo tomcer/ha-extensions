@@ -1,0 +1,9 @@
+# =============================================================================
+# Acond TČ - Input boolean pro ovládací tlačítka
+# Přidej do configuration.yaml:
+#   input_boolean: !include input_boolean_acond.yaml
+# =============================================================================
+
+acond_dhw_boost:
+  name: "Acond Jednorázový ohřev TUV"
+  icon: mdi:water-boiler-alert

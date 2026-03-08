@@ -1,0 +1,113 @@
+# =============================================================================
+# Acond TČ - Automatizace pro ovládání
+# Přidej do configuration.yaml:
+#   automation: !include automation_acond.yaml
+# =============================================================================
+
+# --- Synchronizace input_number s aktuální hodnotou z Modbusu ---
+- id: acond_sync_room_temp_slider
+  alias: "Acond - Sync pokojová teplota slider"
+  trigger:
+    - platform: homeassistant
+      event: start
+    - platform: state
+      entity_id: sensor.acond_pokojova_teplota_setpoint
+  condition:
+    - condition: template
+      value_template: >
+        {{ states('sensor.acond_pokojova_teplota_setpoint') not in ['unknown', 'unavailable'] }}
+  action:
+    - service: input_number.set_value
+      target:
+        entity_id: input_number.acond_room_temp_target
+      data:
+        value: "{{ states('sensor.acond_pokojova_teplota_setpoint') | float }}"
+
+- id: acond_sync_dhw_temp_slider
+  alias: "Acond - Sync TUV teplota slider"
+  trigger:
+    - platform: homeassistant
+      event: start
+    - platform: state
+      entity_id: sensor.acond_tuv_pozadovana
+  condition:
+    - condition: template
+      value_template: >
+        {{ states('sensor.acond_tuv_pozadovana') not in ['unknown', 'unavailable'] }}
+  action:
+    - service: input_number.set_value
+      target:
+        entity_id: input_number.acond_dhw_temp_target
+      data:
+        value: "{{ states('sensor.acond_tuv_pozadovana') | float }}"
+
+# --- Odeslání nové pokojové teploty do TČ ---
+- id: acond_set_room_temp
+  alias: "Acond - Nastavit pokojovou teplotu"
+  trigger:
+    - platform: state
+      entity_id: input_number.acond_room_temp_target
+  condition:
+    - condition: template
+      value_template: >
+        {{ trigger.from_state.state not in ['unknown', 'unavailable'] }}
+  action:
+    - service: shell_command.acond_set_room_temp
+      data:
+        temperature: "{{ states('input_number.acond_room_temp_target') }}"
+
+# --- Odeslání nové TUV teploty do TČ ---
+- id: acond_set_dhw_temp
+  alias: "Acond - Nastavit TUV teplotu"
+  trigger:
+    - platform: state
+      entity_id: input_number.acond_dhw_temp_target
+  condition:
+    - condition: template
+      value_template: >
+        {{ trigger.from_state.state not in ['unknown', 'unavailable'] }}
+  action:
+    - service: shell_command.acond_set_dhw_temp
+      data:
+        temperature: "{{ states('input_number.acond_dhw_temp_target') }}"
+
+# --- Jednorázový ohřev TUV (vypne plán, po 2h zapne zpět) ---
+- id: acond_dhw_boost
+  alias: "Acond - Jednorázový ohřev TUV"
+  trigger:
+    - platform: state
+      entity_id: input_boolean.acond_dhw_boost
+      to: "on"
+  action:
+    - service: shell_command.acond_dhw_schedule_off
+    - wait_template: >
+        {{ is_state('binary_sensor.acond_ohrev_tuv', 'on') }}
+      timeout: "00:05:00"
+      continue_on_timeout: true
+    - wait_template: >
+        {{ is_state('binary_sensor.acond_ohrev_tuv', 'off') }}
+      timeout: "02:00:00"
+      continue_on_timeout: true
+    - service: shell_command.acond_dhw_schedule_on
+    - service: input_boolean.turn_off
+      target:
+        entity_id: input_boolean.acond_dhw_boost
+
+# --- Ruční vypnutí boostu → zapne plán zpět ---
+- id: acond_dhw_boost_off
+  alias: "Acond - Vypnout boost TUV"
+  trigger:
+    - platform: state
+      entity_id: input_boolean.acond_dhw_boost
+      to: "off"
+  action:
+    - service: shell_command.acond_dhw_schedule_on
+
+# --- Kvitace alarmu ---
+- id: acond_alarm_acknowledge
+  alias: "Acond - Kvitace alarmu"
+  trigger:
+    - platform: state
+      entity_id: input_button.acond_alarm_ack
+  action:
+    - service: shell_command.acond_alarm_acknowledge

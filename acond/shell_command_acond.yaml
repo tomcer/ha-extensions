@@ -1,0 +1,58 @@
+# =============================================================================
+# Acond TČ - Shell příkazy pro zápis do Tecomat Foxtrot přes HTTP POST
+# Tecomat vyžaduje přihlášení (cookie session), Modbus write nefunguje
+# =============================================================================
+#
+# Přidej do configuration.yaml:
+#   shell_command: !include shell_command_acond.yaml
+# =============================================================================
+
+# --- Login a nastavení pokojové teploty 1. okruh (R190) ---
+acond_set_room_temp: >-
+  curl -s -c /tmp/acond_cookies.txt
+  -d "USERNAME=acond&PASSWORD=acond&SUBMIT=Login"
+  http://192.168.5.30/syswww/login.xml &&
+  curl -s -b /tmp/acond_cookies.txt
+  -d "__R190_REAL_.1f={{ temperature }}"
+  -H "Content-Type: application/x-www-form-urlencoded"
+  http://192.168.5.30/PAGE49.XML > /dev/null
+
+# --- Login a nastavení TUV teploty (R815) ---
+acond_set_dhw_temp: >-
+  curl -s -c /tmp/acond_cookies.txt
+  -d "USERNAME=acond&PASSWORD=acond&SUBMIT=Login"
+  http://192.168.5.30/syswww/login.xml &&
+  curl -s -b /tmp/acond_cookies.txt
+  -d "__R815_REAL_.1f={{ temperature }}"
+  -H "Content-Type: application/x-www-form-urlencoded"
+  http://192.168.5.30/PAGE49.XML > /dev/null
+
+# --- Vypnutí časového plánu TUV (R805.4=0) → volný ohřev ---
+acond_dhw_schedule_off: >-
+  curl -s -c /tmp/acond_cookies.txt
+  -d "USERNAME=acond&PASSWORD=acond&SUBMIT=Login"
+  http://192.168.5.30/syswww/login.xml &&
+  curl -s -b /tmp/acond_cookies.txt
+  -d "__R805.4_BOOL_i=0"
+  -H "Content-Type: application/x-www-form-urlencoded"
+  http://192.168.5.30/PAGE51.XML > /dev/null
+
+# --- Zapnutí časového plánu TUV (R805.4=1) → zpět na plán ---
+acond_dhw_schedule_on: >-
+  curl -s -c /tmp/acond_cookies.txt
+  -d "USERNAME=acond&PASSWORD=acond&SUBMIT=Login"
+  http://192.168.5.30/syswww/login.xml &&
+  curl -s -b /tmp/acond_cookies.txt
+  -d "__R805.4_BOOL_i=1"
+  -H "Content-Type: application/x-www-form-urlencoded"
+  http://192.168.5.30/PAGE51.XML > /dev/null
+
+# --- Kvitace alarmu (R6787.5=1) → potvrzení/reset chyby ---
+acond_alarm_acknowledge: >-
+  curl -s -c /tmp/acond_cookies.txt
+  -d "USERNAME=acond&PASSWORD=acond&SUBMIT=Login"
+  http://192.168.5.30/syswww/login.xml &&
+  curl -s -b /tmp/acond_cookies.txt
+  -d "__R6787.5_BOOL_i=1"
+  -H "Content-Type: application/x-www-form-urlencoded"
+  http://192.168.5.30/PAGE49.XML > /dev/null

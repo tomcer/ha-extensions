@@ -1,0 +1,20 @@
+# =============================================================================
+# Acond TČ - Command line senzory (čtení dat z web rozhraní)
+# Přidej do configuration.yaml:
+#   command_line: !include command_line_acond.yaml
+# =============================================================================
+
+# --- Text chyby/alarmu z web rozhraní ---
+- sensor:
+    name: "Acond Alarm text"
+    unique_id: acond_alarm_text
+    command: >-
+      curl -s -c /tmp/acond_cookies.txt
+      -d "USERNAME=acond&PASSWORD=acond&SUBMIT=Login"
+      http://192.168.5.30/syswww/login.xml > /dev/null &&
+      curl -s -b /tmp/acond_cookies.txt
+      -H "x-tecomat: data"
+      http://192.168.5.30/PAGE49.XML |
+      sed -n 's/.*R6513_STRING\[80\]_s" VALUE="\([^"]*\)".*/\1/p'
+    scan_interval: 60
+    value_template: "{{ value if value else 'OK' }}"

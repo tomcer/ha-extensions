@@ -1,0 +1,9 @@
+# =============================================================================
+# Acond TČ - Input button pro akce
+# Přidej do configuration.yaml:
+#   input_button: !include input_button_acond.yaml
+# =============================================================================
+
+acond_alarm_ack:
+  name: "Acond Kvitace alarmu"
+  icon: mdi:alert-remove
