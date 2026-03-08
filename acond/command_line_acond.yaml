@@ -12,5 +12,6 @@
     name: "Acond Alarm text"
     unique_id: acond_alarm_text
     command: /config/scripts/acond_read.sh PAGE49.XML 's/.*R6513_STRING\[80\]_s" VALUE="\([^"]*\)".*/\1/p'
-    scan_interval: 60
+    command_timeout: 10
+    scan_interval: 300
     value_template: "{{ value if value else 'OK' }}"

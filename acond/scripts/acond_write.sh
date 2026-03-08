@@ -25,10 +25,10 @@ if [ -z "$PAGE" ] || [ -z "$POST_DATA" ]; then
 fi
 
 # Login and POST
-curl -s -c /tmp/acond_cookies.txt \
+curl -s --max-time 5 -c /tmp/acond_cookies.txt \
   -d "USERNAME=${ACOND_USERNAME}&PASSWORD=${ACOND_PASSWORD}&SUBMIT=Login" \
   "http://${ACOND_HOST}/syswww/login.xml" > /dev/null && \
-curl -s -b /tmp/acond_cookies.txt \
+curl -s --max-time 5 -b /tmp/acond_cookies.txt \
   -d "$POST_DATA" \
   -H "Content-Type: application/x-www-form-urlencoded" \
   "http://${ACOND_HOST}/${PAGE}" > /dev/null

@@ -2,6 +2,8 @@
 # Acond TČ - Template senzory pro dekódování status bitů
 # Přidej do configuration.yaml:
 #   template: !include template_sensors_acond.yaml
+#
+# POZOR: Tecomat čísluje bity od 1 (R805.1 = bit index 0)
 # =============================================================================
 
 - sensor:
@@ -9,75 +11,58 @@
     - name: "Acond Typ regulace"
       unique_id: acond_regulation_type
       icon: mdi:tune
-      state: >
-        {% set raw = states('sensor.acond_status_regulace_raw') | int(0) %}
-        {% set byte = raw % 256 %}
-        {% if byte | bitwise_and(1) %}AT
-        {% elif byte | bitwise_and(2) %}EKV
-        {% elif byte | bitwise_and(4) %}ST
-        {% else %}Neznámý{% endif %}
+      state: >-
+        {% set byte = states('sensor.acond_status_regulace_raw') | int(0) % 256 %}
+        {% if byte | bitwise_and(1) %}AT{% elif byte | bitwise_and(2) %}EKV{% elif byte | bitwise_and(4) %}ST{% else %}Neznámý{% endif %}
 
     # --- Režim provozu (R870 bits 3-7) ---
     - name: "Acond Režim provozu"
       unique_id: acond_operation_mode
       icon: mdi:heat-pump
-      state: >
-        {% set raw = states('sensor.acond_status_regulace_raw') | int(0) %}
-        {% set byte = raw % 256 %}
-        {% if byte | bitwise_and(8) %}Automatický
-        {% elif byte | bitwise_and(16) %}Pouze TČ
-        {% elif byte | bitwise_and(64) %}Bivalence
-        {% elif byte | bitwise_and(128) %}Vypnuto
-        {% else %}Neznámý{% endif %}
+      state: >-
+        {% set byte = states('sensor.acond_status_regulace_raw') | int(0) % 256 %}
+        {% if byte | bitwise_and(8) %}Automatický{% elif byte | bitwise_and(16) %}Pouze TČ{% elif byte | bitwise_and(64) %}Bivalence{% elif byte | bitwise_and(128) %}Vypnuto{% else %}Neznámý{% endif %}
 
 - binary_sensor:
-    # --- Ohřev TUV (R688 bit 0) ---
-    - name: "Acond Ohřev TUV"
+    # --- TUV povolena (R688 bit 0) - neznamená aktuální ohřev, ale že TUV režim je aktivní ---
+    - name: "Acond TUV povolena"
       unique_id: acond_dhw_heating
       icon: mdi:water-boiler
-      state: >
-        {% set raw = states('sensor.acond_status_provoz_raw') | int(0) %}
-        {{ (raw % 256) | bitwise_and(1) > 0 }}
+      state: "{{ (states('sensor.acond_status_provoz_raw') | int(0) % 256) | bitwise_and(1) > 0 }}"
 
     # --- Bivalence (R688 bit 1) ---
     - name: "Acond Bivalence aktivní"
       unique_id: acond_bivalence_active
       icon: mdi:fire
-      state: >
-        {% set raw = states('sensor.acond_status_provoz_raw') | int(0) %}
-        {{ (raw % 256) | bitwise_and(2) > 0 }}
+      state: "{{ (states('sensor.acond_status_provoz_raw') | int(0) % 256) | bitwise_and(2) > 0 }}"
 
-    # --- Antisepse povolena (R805 bit 3 = high byte of reg 402) ---
-    - name: "Acond Antisepse povolena"
-      unique_id: acond_antisepsis_enabled
-      icon: mdi:shield-bug
-      state: >
-        {% set raw = states('sensor.acond_status_prislusenstvi_raw') | int(0) %}
-        {% set high_byte = (raw / 256) | int %}
-        {{ high_byte | bitwise_and(8) > 0 }}
-
-    # --- Útlum ventilátoru (R805 bit 1 = high byte) ---
+    # --- Útlum ventilátoru (R805.1 = high byte bit index 0) ---
     - name: "Acond Útlum ventilátoru"
       unique_id: acond_fan_damping
       icon: mdi:fan-off
-      state: >
-        {% set raw = states('sensor.acond_status_prislusenstvi_raw') | int(0) %}
-        {% set high_byte = (raw / 256) | int %}
-        {{ high_byte | bitwise_and(2) > 0 }}
+      state: "{{ (states('sensor.acond_status_prislusenstvi_raw') | int(0) // 256) | bitwise_and(1) > 0 }}"
 
-    # --- Časový plán TUV povolen (R805 bit 4 = high byte) ---
+    # --- Bivalence příslušenství (R805.2 = high byte bit index 1) ---
+    - name: "Acond Bivalence příslušenství"
+      unique_id: acond_bivalence_accessory
+      icon: mdi:fire-circle
+      state: "{{ (states('sensor.acond_status_prislusenstvi_raw') | int(0) // 256) | bitwise_and(2) > 0 }}"
+
+    # --- Antisepse povolena (R805.3 = high byte bit index 2) ---
+    - name: "Acond Antisepse povolena"
+      unique_id: acond_antisepsis_enabled
+      icon: mdi:shield-bug
+      state: "{{ (states('sensor.acond_status_prislusenstvi_raw') | int(0) // 256) | bitwise_and(4) > 0 }}"
+
+    # --- Časový plán TUV povolen (R805.4 = high byte bit index 3) ---
     - name: "Acond TUV časový plán"
       unique_id: acond_dhw_schedule_enabled
       icon: mdi:clock-check
-      state: >
-        {% set raw = states('sensor.acond_status_prislusenstvi_raw') | int(0) %}
-        {% set high_byte = (raw / 256) | int %}
-        {{ high_byte | bitwise_and(16) > 0 }}
+      state: "{{ (states('sensor.acond_status_prislusenstvi_raw') | int(0) // 256) | bitwise_and(8) > 0 }}"
 
     # --- Alarm aktivní (R8827 bit 0 = high byte of reg 4413) ---
     - name: "Acond Alarm"
       unique_id: acond_alarm_active
       device_class: problem
       icon: mdi:alert-circle
-      state: >
-        {{ states('sensor.acond_alarm_raw') | int(0) > 0 }}
+      state: "{{ states('sensor.acond_alarm_raw') | int(0) > 0 }}"

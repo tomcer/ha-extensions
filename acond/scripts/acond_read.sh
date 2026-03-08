@@ -24,17 +24,17 @@ if [ -z "$PAGE" ]; then
 fi
 
 # Login
-curl -s -c /tmp/acond_cookies.txt \
+curl -s --max-time 5 -c /tmp/acond_cookies.txt \
   -d "USERNAME=${ACOND_USERNAME}&PASSWORD=${ACOND_PASSWORD}&SUBMIT=Login" \
   "http://${ACOND_HOST}/syswww/login.xml" > /dev/null
 
 # Read with optional sed filter
 if [ -n "$SED_PATTERN" ]; then
-  curl -s -b /tmp/acond_cookies.txt \
+  curl -s --max-time 5 -b /tmp/acond_cookies.txt \
     -H "x-tecomat: data" \
     "http://${ACOND_HOST}/${PAGE}" | sed -n "$SED_PATTERN"
 else
-  curl -s -b /tmp/acond_cookies.txt \
+  curl -s --max-time 5 -b /tmp/acond_cookies.txt \
     -H "x-tecomat: data" \
     "http://${ACOND_HOST}/${PAGE}"
 fi

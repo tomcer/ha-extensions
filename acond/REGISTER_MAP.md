@@ -96,12 +96,14 @@ curl -c /tmp/cookies.txt -d "USERNAME=<ACOND_USER>&PASSWORD=<ACOND_PASS>&SUBMIT=
 
 ### R805 - Příslušenství (HIGH byte of reg 402)
 
-| Bit | Popis |
-|-----|-------|
-| 1 | Útlum ventilátoru |
-| 2 | Bivalence aktivní |
-| 3 | Antisepse povolena |
-| 4 | **Časový plán TUV povolen** |
+Tecomat čísluje bity od 1 (R805.1 = bit index 0 v high byte).
+
+| R805.x | Bit index | Mask | Popis |
+|--------|-----------|------|-------|
+| R805.1 | 0 | 0x01 | Útlum ventilátoru |
+| R805.2 | 1 | 0x02 | Bivalence aktivní |
+| R805.3 | 2 | 0x04 | Antisepse povolena |
+| R805.4 | 3 | 0x08 | **Časový plán TUV povolen** |
 
 ## Fyzické výstupy (Y-zone)
 
