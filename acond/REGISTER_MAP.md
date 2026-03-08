@@ -2,10 +2,9 @@
 
 ## Řídící jednotka
 - **PLC:** Tecomat Foxtrot (SW verze 61.8, FW 10.6)
-- **IP:** 192.168.5.30
+- **IP:** `<ACOND_HOST>` (konfigurace v `scripts/acond_config.sh`)
 - **Modbus TCP port:** 502, slave ID: 1
-- **Web rozhraní:** HTTP port 80, login acond/acond (servis/servis pro rozšířené)
-- **Datum instalace:** 14.5.2019
+- **Web rozhraní:** HTTP port 80, login viz `scripts/acond_config.sh`
 
 ## Mapování Tecomat R-registrů na Modbus
 
@@ -34,8 +33,8 @@ __R190_REAL_.1f=22.0
 
 ### Přihlášení (nutné pro POST)
 ```bash
-curl -c /tmp/cookies.txt -d "USERNAME=acond&PASSWORD=acond&SUBMIT=Login" \
-  http://192.168.5.30/syswww/login.xml
+curl -c /tmp/cookies.txt -d "USERNAME=<ACOND_USER>&PASSWORD=<ACOND_PASS>&SUBMIT=Login" \
+  http://<ACOND_HOST>/syswww/login.xml
 ```
 
 ## Ověřené registry - Teploty (float32, swap: word) - ČTENÍ přes Modbus
@@ -154,36 +153,36 @@ Regulace jde pouze podle ekviterm křivky.
 
 ```bash
 # Čtení float hodnoty
-mbpoll -a 1 -t 4:float -0 -r 3102 -c 1 -1 192.168.5.30
+mbpoll -a 1 -t 4:float -0 -r 3102 -c 1 -1 <ACOND_HOST>
 
 # Čtení 16-bit hex (pro status registry)
-mbpoll -a 1 -t 4:hex -0 -r 435 -c 1 -1 192.168.5.30
+mbpoll -a 1 -t 4:hex -0 -r 435 -c 1 -1 <ACOND_HOST>
 
 # Čtení bloku teplot (R6180-R6240)
-mbpoll -a 1 -t 4:float -0 -r 3090 -c 16 -1 192.168.5.30
+mbpoll -a 1 -t 4:float -0 -r 3090 -c 16 -1 <ACOND_HOST>
 ```
 
 ## Příkazy pro curl (zápis)
 
 ```bash
 # Login
-curl -c /tmp/c.txt -d "USERNAME=acond&PASSWORD=acond&SUBMIT=Login" \
-  http://192.168.5.30/syswww/login.xml
+curl -c /tmp/c.txt -d "USERNAME=<ACOND_USER>&PASSWORD=<ACOND_PASS>&SUBMIT=Login" \
+  http://<ACOND_HOST>/syswww/login.xml
 
 # Nastavení pokojové teploty
 curl -b /tmp/c.txt -d "__R190_REAL_.1f=22.0" \
   -H "Content-Type: application/x-www-form-urlencoded" \
-  http://192.168.5.30/PAGE49.XML
+  http://<ACOND_HOST>/PAGE49.XML
 
 # Vypnutí TUV plánu (jednorázový ohřev)
 curl -b /tmp/c.txt -d "__R805.4_BOOL_i=0" \
   -H "Content-Type: application/x-www-form-urlencoded" \
-  http://192.168.5.30/PAGE49.XML
+  http://<ACOND_HOST>/PAGE49.XML
 
 # Zapnutí TUV plánu zpět
 curl -b /tmp/c.txt -d "__R805.4_BOOL_i=1" \
   -H "Content-Type: application/x-www-form-urlencoded" \
-  http://192.168.5.30/PAGE49.XML
+  http://<ACOND_HOST>/PAGE49.XML
 ```
 
 ## Poznámky k existujícím HA pluginům

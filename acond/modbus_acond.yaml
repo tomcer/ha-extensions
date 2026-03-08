@@ -15,7 +15,7 @@
 
 - name: acond
   type: tcp
-  host: 192.168.5.30
+  host: !secret acond_host
   port: 502
   delay: 1
   timeout: 5

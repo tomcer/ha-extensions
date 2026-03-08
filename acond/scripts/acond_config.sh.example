@@ -1,0 +1,6 @@
+# Acond TČ - connection configuration
+# Copy this file to acond_config.sh and fill in your values
+
+ACOND_HOST="192.168.x.x"
+ACOND_USERNAME="acond"
+ACOND_PASSWORD="acond"
