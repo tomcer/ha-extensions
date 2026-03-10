@@ -1,68 +1,156 @@
 # =============================================================================
-# Acond TČ - Template senzory pro dekódování status bitů
+# Acond TČ - Template senzory pro dekódování statusů
+# Firmware: ModbusTCP v2.34+
 # Přidej do configuration.yaml:
 #   template: !include template_sensors_acond.yaml
-#
-# POZOR: Tecomat čísluje bity od 1 (R805.1 = bit index 0)
 # =============================================================================
 
 - sensor:
-    # --- Režim regulace (R870 bits 0-2) ---
-    - name: "Acond Typ regulace"
-      unique_id: acond_regulation_type
-      icon: mdi:tune
-      state: >-
-        {% set byte = states('sensor.acond_status_regulace_raw') | int(0) % 256 %}
-        {% if byte | bitwise_and(1) %}AT{% elif byte | bitwise_and(2) %}EKV{% elif byte | bitwise_and(4) %}ST{% else %}Neznámý{% endif %}
-
-    # --- Režim provozu (R870 bits 3-7) ---
+    # --- Režim TČ (z číselníku rezim_pan, reg 30014) ---
     - name: "Acond Režim provozu"
       unique_id: acond_operation_mode
       icon: mdi:heat-pump
       state: >-
-        {% set byte = states('sensor.acond_status_regulace_raw') | int(0) % 256 %}
-        {% if byte | bitwise_and(8) %}Automatický{% elif byte | bitwise_and(16) %}Pouze TČ{% elif byte | bitwise_and(64) %}Bivalence{% elif byte | bitwise_and(128) %}Vypnuto{% else %}Neznámý{% endif %}
+        {% set mode = states('sensor.acond_rezim_tc_raw') | int(-1) %}
+        {% set modes = {0: 'Automatický', 1: 'Pouze TČ', 3: 'Bivalence', 4: 'Vypnuto', 5: 'Manuální', 6: 'Chlazení'} %}
+        {{ modes.get(mode, 'Neznámý (' ~ mode ~ ')') }}
+
+    # --- Typ regulace (z číselníku typ_reg_pan, reg 30015) ---
+    - name: "Acond Typ regulace"
+      unique_id: acond_regulation_type
+      icon: mdi:tune
+      state: >-
+        {% set reg = states('sensor.acond_typ_regulace_raw') | int(-1) %}
+        {% set types = {0: 'AcondTherm', 1: 'Ekviterm', 2: 'Standard'} %}
+        {{ types.get(reg, 'Neznámý (' ~ reg ~ ')') }}
 
 - binary_sensor:
-    # --- TUV povolena (R688 bit 0) - neznamená aktuální ohřev, ale že TUV režim je aktivní ---
-    - name: "Acond TUV povolena"
+    # --- TC_status bitové pole (reg 30007) ---
+
+    # Bit 0 - TČ zapnuto
+    - name: "Acond TČ zapnuto"
+      unique_id: acond_hp_on
+      icon: mdi:power
+      state: "{{ (states('sensor.acond_status_tc_raw') | int(0)) | bitwise_and(1) > 0 }}"
+
+    # Bit 1 - TČ v chodu (kompresor běží)
+    - name: "Acond TČ v chodu"
+      unique_id: acond_hp_running
+      icon: mdi:heat-pump-outline
+      state: "{{ (states('sensor.acond_status_tc_raw') | int(0)) | bitwise_and(2) > 0 }}"
+
+    # Bit 2 - TČ v poruše
+    - name: "Acond Porucha"
+      unique_id: acond_hp_fault
+      device_class: problem
+      icon: mdi:alert-circle
+      state: "{{ (states('sensor.acond_status_tc_raw') | int(0)) | bitwise_and(4) > 0 }}"
+
+    # Bit 3 - Probíhá ohřev TUV
+    - name: "Acond Ohřev TUV"
       unique_id: acond_dhw_heating
       icon: mdi:water-boiler
-      state: "{{ (states('sensor.acond_status_provoz_raw') | int(0) % 256) | bitwise_and(1) > 0 }}"
+      state: "{{ (states('sensor.acond_status_tc_raw') | int(0)) | bitwise_and(8) > 0 }}"
 
-    # --- Bivalence (R688 bit 1) ---
+    # Bit 4 - Oběhové čerpadlo topný okruh 1
+    - name: "Acond Oběh. čerpadlo okruh 1"
+      unique_id: acond_pump_circuit1
+      icon: mdi:pump
+      state: "{{ (states('sensor.acond_status_tc_raw') | int(0)) | bitwise_and(16) > 0 }}"
+
+    # Bit 5 - Oběhové čerpadlo topný okruh 2
+    - name: "Acond Oběh. čerpadlo okruh 2"
+      unique_id: acond_pump_circuit2
+      icon: mdi:pump
+      state: "{{ (states('sensor.acond_status_tc_raw') | int(0)) | bitwise_and(32) > 0 }}"
+
+    # Bit 6 - Oběhové čerpadlo soláru
+    - name: "Acond Oběh. čerpadlo solár"
+      unique_id: acond_pump_solar
+      icon: mdi:solar-power
+      state: "{{ (states('sensor.acond_status_tc_raw') | int(0)) | bitwise_and(64) > 0 }}"
+
+    # Bit 7 - Oběhové čerpadlo bazénu
+    - name: "Acond Oběh. čerpadlo bazén"
+      unique_id: acond_pump_pool
+      icon: mdi:pool
+      state: "{{ (states('sensor.acond_status_tc_raw') | int(0)) | bitwise_and(128) > 0 }}"
+
+    # Bit 8 - Odmrazení
+    - name: "Acond Odmrazení"
+      unique_id: acond_defrost
+      icon: mdi:snowflake-melt
+      state: "{{ (states('sensor.acond_status_tc_raw') | int(0)) | bitwise_and(256) > 0 }}"
+
+    # Bit 9 - Bivalence v chodu
     - name: "Acond Bivalence aktivní"
       unique_id: acond_bivalence_active
       icon: mdi:fire
-      state: "{{ (states('sensor.acond_status_provoz_raw') | int(0) % 256) | bitwise_and(2) > 0 }}"
+      state: "{{ (states('sensor.acond_status_tc_raw') | int(0)) | bitwise_and(512) > 0 }}"
 
-    # --- Útlum ventilátoru (R805.1 = high byte bit index 0) ---
-    - name: "Acond Útlum ventilátoru"
-      unique_id: acond_fan_damping
-      icon: mdi:fan-off
-      state: "{{ (states('sensor.acond_status_prislusenstvi_raw') | int(0) // 256) | bitwise_and(1) > 0 }}"
+    # Bit 10 - Letní provoz
+    - name: "Acond Letní provoz"
+      unique_id: acond_summer_mode
+      icon: mdi:white-balance-sunny
+      state: "{{ (states('sensor.acond_status_tc_raw') | int(0)) | bitwise_and(1024) > 0 }}"
 
-    # --- Bivalence příslušenství (R805.2 = high byte bit index 1) ---
-    - name: "Acond Bivalence příslušenství"
-      unique_id: acond_bivalence_accessory
-      icon: mdi:fire-circle
-      state: "{{ (states('sensor.acond_status_prislusenstvi_raw') | int(0) // 256) | bitwise_and(2) > 0 }}"
+    # Bit 11 - Oběhové čerpadlo solanka
+    - name: "Acond Oběh. čerpadlo solanka"
+      unique_id: acond_pump_brine
+      icon: mdi:pump
+      state: "{{ (states('sensor.acond_status_tc_raw') | int(0)) | bitwise_and(2048) > 0 }}"
 
-    # --- Antisepse povolena (R805.3 = high byte bit index 2) ---
-    - name: "Acond Antisepse povolena"
-      unique_id: acond_antisepsis_enabled
-      icon: mdi:shield-bug
-      state: "{{ (states('sensor.acond_status_prislusenstvi_raw') | int(0) // 256) | bitwise_and(4) > 0 }}"
+    # Bit 12 - Chlazení v chodu
+    - name: "Acond Chlazení aktivní"
+      unique_id: acond_cooling_active
+      icon: mdi:snowflake
+      state: "{{ (states('sensor.acond_status_tc_raw') | int(0)) | bitwise_and(4096) > 0 }}"
 
-    # --- Časový plán TUV povolen (R805.4 = high byte bit index 3) ---
-    - name: "Acond TUV časový plán"
-      unique_id: acond_dhw_schedule_enabled
-      icon: mdi:clock-check
-      state: "{{ (states('sensor.acond_status_prislusenstvi_raw') | int(0) // 256) | bitwise_and(8) > 0 }}"
-
-    # --- Alarm aktivní (R8827 bit 0 = high byte of reg 4413) ---
+    # --- Chyba aktivní (TC_status bit 2 = TČ v poruše) ---
     - name: "Acond Alarm"
       unique_id: acond_alarm_active
       device_class: problem
       icon: mdi:alert-circle
-      state: "{{ states('sensor.acond_alarm_raw') | int(0) > 0 }}"
+      state: "{{ (states('sensor.acond_status_tc_raw') | int(0)) | bitwise_and(4) > 0 }}"
+
+    # --- Web hodnoty (z acond_web_poller.sh → JSON atributy) ---
+
+    # HDO blokace (X160.1 na PLC, 0=blokuje, 1=neblokuje)
+    - name: "Acond HDO blokace"
+      unique_id: acond_hdo_block
+      icon: mdi:transmission-tower-off
+      state: >-
+        {% set val = state_attr('sensor.acond_web_poller', 'hdo_block') %}
+        {{ 'on' if val == 0 else 'off' }}
+
+    # TUV časový plán (R805.4, 1=zapnut)
+    - name: "Acond TUV plán"
+      unique_id: acond_tuv_schedule
+      icon: mdi:water-boiler-auto
+      state: >-
+        {% set val = state_attr('sensor.acond_web_poller', 'tuv_schedule') %}
+        {{ 'on' if val == 1 else 'off' }}
+
+    # TUV ohřev povolen (R805.3, 1=zapnut)
+    - name: "Acond TUV ohřev povolen"
+      unique_id: acond_tuv_heating_enabled
+      icon: mdi:water-boiler
+      state: >-
+        {% set val = state_attr('sensor.acond_web_poller', 'tuv_heating_enabled') %}
+        {{ 'on' if val == 1 else 'off' }}
+
+    # Topení plán (R805.2, 1=zapnut)
+    - name: "Acond Topení plán"
+      unique_id: acond_heating_schedule
+      icon: mdi:calendar-clock
+      state: >-
+        {% set val = state_attr('sensor.acond_web_poller', 'heating_schedule') %}
+        {{ 'on' if val == 1 else 'off' }}
+
+    # Noční útlum (R805.1, 1=zapnut)
+    - name: "Acond Noční útlum"
+      unique_id: acond_night_setback
+      icon: mdi:weather-night
+      state: >-
+        {% set val = state_attr('sensor.acond_web_poller', 'night_setback') %}
+        {{ 'on' if val == 1 else 'off' }}"

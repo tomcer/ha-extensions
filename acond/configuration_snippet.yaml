@@ -3,7 +3,7 @@
 # =============================================================================
 #
 # 1. Zkopíruj *_acond.yaml soubory do HA /config/
-# 2. Zkopíruj scripts/ adresář do /config/scripts/
+# 2. Zkopíruj scripts/ adresář do /config/scripts/ (pro HDO čtení)
 # 3. Vytvoř /config/scripts/acond_config.sh z acond_config.sh.example
 # 4. Přidej acond_host do secrets.yaml (viz secrets.yaml.example)
 # 5. Přidej tyto řádky do configuration.yaml:
@@ -11,8 +11,8 @@
 
 modbus: !include modbus_acond.yaml
 template: !include template_sensors_acond.yaml
-shell_command: !include shell_command_acond.yaml
-command_line: !include command_line_acond.yaml
 automation: !include automation_acond.yaml
+command_line: !include command_line_acond.yaml
+shell_command: !include shell_command_acond.yaml
 input_number: !include input_number_acond.yaml
 input_boolean: !include input_boolean_acond.yaml

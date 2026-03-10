@@ -1,13 +1,13 @@
 # =============================================================================
-# Acond TČ 12 Monoblok EVI-M - Home Assistant Modbus konfigurace
-# Řídící jednotka: Tecomat Foxtrot
-# Komunikace: Modbus TCP, holding registry, 32-bit float (word swap)
+# Acond TČ - Home Assistant Modbus konfigurace
+# Firmware: ModbusTCP v2.34+
+# Komunikace: Modbus TCP, Int x10 (teploty), Big Endian
 # =============================================================================
 #
-# MAPOVÁNÍ REGISTRŮ:
-#   Tecomat R-registr (byte address) → Modbus holding register = R_addr / 2
-#   Data type: float32, byte order: word swap (CDAB)
-#   Pozor: Pouze sudé R-adresy jsou čitelné jako float (zarovnání na 16-bit)
+# DŮLEŽITÉ:
+#   - Slave ID = 0 (ne 1 jak uvádí PDF!) - ověřeno raw testem
+#   - Tecomat Foxtrot má limit TCP spojení, používáme jedno Modbus spojení
+#   - Input registers (FC4) pro čtení, Holding (FC3/6/16) pro čtení i zápis
 #
 # Přidej do configuration.yaml:
 #   modbus: !include modbus_acond.yaml
@@ -18,264 +18,171 @@
   host: !secret acond_host
   port: 502
   delay: 1
-  timeout: 5
+  timeout: 10
   retries: 3
+  message_wait_milliseconds: 300
 
   # ---------------------------------------------------------------------------
-  # SENZORY - čtení teplot
+  # SENZORY - Input registry (read-only, function code 4)
   # ---------------------------------------------------------------------------
   sensors:
-    # --- Teplota v místnosti ---
+    # === KLÍČOVÉ TEPLOTY (scan 30s) ===
+
     - name: "Acond Teplota v místnosti"
       unique_id: acond_room_temp
-      address: 3102        # R6204
-      slave: 1
-      input_type: holding
-      data_type: float32
-      swap: word
+      address: 1             # 30002 T_act_indoor1
+      slave: 2
+      input_type: input
+      data_type: int16
+      scale: 0.1
       device_class: temperature
       unit_of_measurement: "°C"
       state_class: measurement
       precision: 1
       scan_interval: 30
+
+    - name: "Acond TUV aktuální"
+      unique_id: acond_dhw_temp
+      address: 5             # 30006 T_act_TUV
+      slave: 2
+      input_type: input
+      data_type: int16
+      scale: 0.1
+      device_class: temperature
+      unit_of_measurement: "°C"
+      state_class: measurement
+      precision: 1
+      scan_interval: 30
+
+    - name: "Acond Status TČ raw"
+      unique_id: acond_tc_status_raw
+      address: 6             # 30007 TC_status
+      slave: 2
+      input_type: input
+      data_type: uint16
+      scan_interval: 30
+
+    # POZN: Registry 20-23 (err_number, comp_rpm) vrací exception na tomto FW
+    # Chybové kódy a otáčky kompresoru zatím nedostupné
+
+    # === SETPOINTY A PROVOZ (scan 60s) ===
 
     - name: "Acond Teplota v místnosti požadovaná"
       unique_id: acond_room_temp_setpoint
-      address: 3104        # R6208
-      slave: 1
-      input_type: holding
-      data_type: float32
-      swap: word
+      address: 0             # 30001 T_set_indoor1
+      slave: 2
+      input_type: input
+      data_type: int16
+      scale: 0.1
       device_class: temperature
       unit_of_measurement: "°C"
       precision: 1
       scan_interval: 60
-
-    # --- Teplota v místnosti 2. okruh ---
-    - name: "Acond Teplota místnost 2. okruh"
-      unique_id: acond_room_temp_2
-      address: 3092        # R6184
-      slave: 1
-      input_type: holding
-      data_type: float32
-      swap: word
-      device_class: temperature
-      unit_of_measurement: "°C"
-      state_class: measurement
-      precision: 1
-      scan_interval: 30
-
-    # --- Pokojová teplota - setpoint (zapisovatelný přes HTTP POST) ---
-    - name: "Acond Pokojová teplota setpoint"
-      unique_id: acond_room_temp_setpoint_rw
-      address: 95          # R190 - uživatelský vstup pokojové teploty
-      slave: 1
-      input_type: holding
-      data_type: float32
-      swap: word
-      device_class: temperature
-      unit_of_measurement: "°C"
-      precision: 1
-      scan_interval: 30
-
-    # --- Teplota vody v deskovém výměníku ---
-    - name: "Acond Teplota deskový výměník"
-      unique_id: acond_heat_exchanger_temp
-      address: 3090        # R6180
-      slave: 1
-      input_type: holding
-      data_type: float32
-      swap: word
-      device_class: temperature
-      unit_of_measurement: "°C"
-      state_class: measurement
-      precision: 1
-      scan_interval: 30
-
-    # --- Teplota kondenzátoru/výstupu ---
-    - name: "Acond Teplota výstup"
-      unique_id: acond_outlet_temp
-      address: 3096        # R6192
-      slave: 1
-      input_type: holding
-      data_type: float32
-      swap: word
-      device_class: temperature
-      unit_of_measurement: "°C"
-      state_class: measurement
-      precision: 1
-      scan_interval: 30
-
-    # --- Venkovní teploty ---
-    - name: "Acond Venkovní teplota"
-      unique_id: acond_outdoor_temp
-      address: 3100        # R6200
-      slave: 1
-      input_type: holding
-      data_type: float32
-      swap: word
-      device_class: temperature
-      unit_of_measurement: "°C"
-      state_class: measurement
-      precision: 1
-      scan_interval: 60
-
-    - name: "Acond Venkovní teplota průměrná"
-      unique_id: acond_outdoor_temp_avg
-      address: 36          # R72
-      slave: 1
-      input_type: holding
-      data_type: float32
-      swap: word
-      device_class: temperature
-      unit_of_measurement: "°C"
-      state_class: measurement
-      precision: 1
-      scan_interval: 300
-
-    # --- TUV (Teplá užitková voda) ---
-    - name: "Acond TUV aktuální"
-      unique_id: acond_dhw_temp
-      address: 3106        # R6212
-      slave: 1
-      input_type: holding
-      data_type: float32
-      swap: word
-      device_class: temperature
-      unit_of_measurement: "°C"
-      state_class: measurement
-      precision: 1
-      scan_interval: 30
 
     - name: "Acond TUV požadovaná"
       unique_id: acond_dhw_temp_setpoint
-      address: 3108        # R6216
-      slave: 1
-      input_type: holding
-      data_type: float32
-      swap: word
+      address: 4             # 30005 T_set_TUV
+      slave: 2
+      input_type: input
+      data_type: int16
+      scale: 0.1
       device_class: temperature
       unit_of_measurement: "°C"
       precision: 1
       scan_interval: 60
 
-    # --- Další teploty ---
-    - name: "Acond Teplota R6196"
-      unique_id: acond_temp_r6196
-      address: 3098        # R6196
-      slave: 1
-      input_type: holding
-      data_type: float32
-      swap: word
+    - name: "Acond Venkovní teplota"
+      unique_id: acond_outdoor_temp
+      address: 9             # 30010 T_act_air
+      slave: 2
+      input_type: input
+      data_type: int16
+      scale: 0.1
       device_class: temperature
       unit_of_measurement: "°C"
       state_class: measurement
       precision: 1
       scan_interval: 60
 
-    - name: "Acond Teplota R6220"
-      unique_id: acond_temp_r6220
-      address: 3110        # R6220
-      slave: 1
-      input_type: holding
-      data_type: float32
-      swap: word
+    - name: "Acond Teplota zpátečky"
+      unique_id: acond_water_back_temp
+      address: 8             # 30009 T_act_water_back
+      slave: 2
+      input_type: input
+      data_type: int16
+      scale: 0.1
       device_class: temperature
       unit_of_measurement: "°C"
       state_class: measurement
       precision: 1
       scan_interval: 60
 
-    # --- Konec ohřevu ---
-    - name: "Acond Konec ohřevu"
-      unique_id: acond_heating_end
-      address: 385         # R770
-      slave: 1
-      input_type: holding
-      data_type: float32
-      swap: word
+    - name: "Acond Teplota výstup"
+      unique_id: acond_outlet_temp
+      address: 17            # 30018 T_act_water_outlet
+      slave: 2
+      input_type: input
+      data_type: int16
+      scale: 0.1
+      device_class: temperature
+      unit_of_measurement: "°C"
+      state_class: measurement
+      precision: 1
+      scan_interval: 60
+
+    - name: "Acond Režim TČ raw"
+      unique_id: acond_mode_raw
+      address: 13            # 30014 rezim_pan
+      slave: 2
+      input_type: input
+      data_type: int16
+      scan_interval: 60
+
+    - name: "Acond Typ regulace raw"
+      unique_id: acond_regulation_type_raw
+      address: 14            # 30015 typ_reg_pan
+      slave: 2
+      input_type: input
+      data_type: int16
+      scan_interval: 60
+
+    # === MÉNĚ KRITICKÉ (scan 120s) ===
+
+    - name: "Acond Teplota místnost 2"
+      unique_id: acond_room_temp_2
+      address: 3             # 30004 T_act_indoor2
+      slave: 2
+      input_type: input
+      data_type: int16
+      scale: 0.1
+      device_class: temperature
+      unit_of_measurement: "°C"
+      state_class: measurement
+      precision: 1
+      scan_interval: 120
+
+    - name: "Acond Teplota zpátečky požadovaná"
+      unique_id: acond_water_back_setpoint
+      address: 7             # 30008 T_set_water_back
+      slave: 2
+      input_type: input
+      data_type: int16
+      scale: 0.1
       device_class: temperature
       unit_of_measurement: "°C"
       precision: 1
-      scan_interval: 300
+      scan_interval: 120
 
-    # --- Verze SW ---
-    - name: "Acond Verze SW"
-      unique_id: acond_sw_version
-      address: 904         # R1808
-      slave: 1
-      input_type: holding
-      data_type: float32
-      swap: word
-      precision: 1
-      scan_interval: 3600
+    - name: "Acond Heartbeat"
+      unique_id: acond_heartbeat
+      address: 16            # 30017 HeartBeat
+      slave: 2
+      input_type: input
+      data_type: int16
+      scan_interval: 120
 
-    # --- Status registr R870 (raw pro template senzory) ---
-    - name: "Acond Status regulace raw"
-      unique_id: acond_regulation_status_raw
-      address: 435         # R870 (low byte) + R871 (high byte)
-      slave: 1
-      input_type: holding
-      data_type: uint16
-      scan_interval: 30
+    # POZN: Chybové kódy (addr 21-22) zatím nedostupné na tomto FW
 
-    # --- Status registr R688 ---
-    - name: "Acond Status provoz raw"
-      unique_id: acond_operation_status_raw
-      address: 344         # R688 (low byte) + R689 (high byte)
-      slave: 1
-      input_type: holding
-      data_type: uint16
-      scan_interval: 30
-
-    # --- Status registr R805 ---
-    - name: "Acond Status příslušenství raw"
-      unique_id: acond_accessories_status_raw
-      address: 402         # R804 (low byte) + R805 (high byte)
-      slave: 1
-      input_type: holding
-      data_type: uint16
-      scan_interval: 30
-
-    # --- Ekviterm křivka ---
-    - name: "Acond Ekviterm max teplota"
-      unique_id: acond_equitherm_max_temp
-      address: 74          # R148
-      slave: 1
-      input_type: holding
-      data_type: float32
-      swap: word
-      device_class: temperature
-      unit_of_measurement: "°C"
-      precision: 1
-      scan_interval: 3600
-
-    - name: "Acond Ekviterm min teplota"
-      unique_id: acond_equitherm_min_temp
-      address: 80          # R160
-      slave: 1
-      input_type: holding
-      data_type: float32
-      swap: word
-      device_class: temperature
-      unit_of_measurement: "°C"
-      precision: 1
-      scan_interval: 3600
-
-    # --- Chybový kód ---
-    - name: "Acond Chyba kód"
-      unique_id: acond_error_code
-      address: 3368        # R6737 (6737/2=3368.5 → 3368 as USINT in low byte)
-      slave: 1
-      input_type: holding
-      data_type: uint16
-      scan_interval: 30
-
-    # --- Příznak alarmu R8827 (high byte of reg 4413) ---
-    - name: "Acond Alarm raw"
-      unique_id: acond_alarm_raw
-      address: 4413        # R8826/R8827
-      slave: 1
-      input_type: holding
-      data_type: uint16
-      scan_interval: 30
+    # POZN: Holding registry (FC3 čtení) způsobují ILLEGAL DATA ADDRESS na TČ.
+    # Write (FC6) funguje - používáme jen pro zápis v automatizacích.
+    # Čtení setpointů jde přes input registry (FC4) výše.

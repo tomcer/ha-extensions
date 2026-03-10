@@ -1,195 +1,153 @@
-# Acond TČ 12 Monoblok EVI-M - Mapa Modbus registrů
+# Acond TČ - Mapa Modbus registrů (ModbusTCP v2.34)
 
-## Řídící jednotka
-- **PLC:** Tecomat Foxtrot (SW verze 61.8, FW 10.6)
-- **IP:** `<ACOND_HOST>` (konfigurace v `scripts/acond_config.sh`)
-- **Modbus TCP port:** 502, slave ID: 1
-- **Web rozhraní:** HTTP port 80, login viz `scripts/acond_config.sh`
+## Komunikační protokol
+- **Protokol:** ModbusTCP, port 502
+- **Kódování:** Big Endian
+- **Režim:** TČ = Slave, uživatel = Master
+- **Slave ID:** 1
+- **Funkce:** 3, 4 (čtení), 6, 16 (zápis)
+- **Aktivace:** Vyžaduje aktivaci servisním oddělením (601 373 073)
 
-## Mapování Tecomat R-registrů na Modbus
+## Input registry - Read data (function code 4)
 
-```
-Modbus holding register = R_addr / 2
-Data type: 32-bit float IEEE 754, word swap (CDAB)
-```
+Adresa 0-based (30001 → addr 0). Teploty: Int x10 (scale 0.1 v HA).
 
-Platí pouze pro **sudé** R-adresy. Liché R-adresy (R815, R721) jsou nezarovnané
-a nelze je přečíst jako standardní float32 přes dvě po sobě jdoucí 16-bit registry.
+| Addr | Modbus | Tag | Typ | Jednotky | Min | Max | Popis |
+|------|--------|-----|-----|----------|-----|-----|-------|
+| 0 | 30001 | T_set_indoor1 | Int x10 | °C | 100 | 300 | Žádaná teplota místnost okruh 1 |
+| 1 | 30002 | T_act_indoor1 | Int x10 | °C | 0 | 500 | Aktuální teplota místnost okruh 1 |
+| 2 | 30003 | T_set_indoor2 | Int x10 | °C | 100 | 300 | Žádaná teplota místnost okruh 2 |
+| 3 | 30004 | T_act_indoor2 | Int x10 | °C | 0 | 500 | Aktuální teplota místnost okruh 2 |
+| 4 | 30005 | T_set_TUV | Int x10 | °C | 100 | 460 | Žádaná teplota TUV |
+| 5 | 30006 | T_act_TUV | Int x10 | °C | 0 | 900 | Aktuální teplota TUV |
+| 6 | 30007 | TC_status | Word | - | - | - | Bitový stav TČ (viz níže) |
+| 7 | 30008 | T_set_water_back | Int x10 | °C | 200 | 600 | Žádaná teplota zpátečky |
+| 8 | 30009 | T_act_water_back | Int x10 | °C | -100 | 900 | Aktuální teplota zpátečky |
+| 9 | 30010 | T_act_air | Int x10 | °C | -500 | 500 | Venkovní teplota |
+| 10 | 30011 | T_act_solar | Int x10 | °C | -500 | 3000 | Teplota soláru |
+| 11 | 30012 | T_act_pool | Int x10 | °C | 0 | 500 | Teplota bazénu |
+| 12 | 30013 | T_set_pool | Int x10 | °C | - | - | Žádaná teplota bazénu |
+| 13 | 30014 | rezim_pan | Int | - | - | - | Režim TČ (číselník) |
+| 14 | 30015 | typ_reg_pan | Int | - | - | - | Typ regulace (číselník) |
+| 15 | 30016 | T_solanka | Int x10 | °C | -300 | 500 | Teplota solanky |
+| 16 | 30017 | HeartBeat | Int | - | 0 | 255 | Čítač komunikace |
+| 17 | 30018 | T_act_water_outlet | Int x10 | °C | -100 | 900 | Teplota výstupní vody |
+| 18 | 30019 | T_set_water_outlet | Int x10 | °C | 10 | 25 | Žádaná teplota výstupu (chlazení) |
+| 19 | 30020 | Comp_rpm_max | Int | rpm | 0 | 7000 | Max otáčky kompresoru* |
+| 20 | 30021 | err_number | Int | - | 0 | 62 | Číslo základní poruchy |
+| 21 | 30022 | err_number_SECMono | Int | - | 0 | 42 | Číslo poruchy SECMono |
+| 22 | 30023 | err_number_driver | Int | - | 0 | 39 | Číslo poruchy driveru |
+| 23 | 30024 | comp_rpm_actual | Int | rpm | 0 | 7000 | Aktuální otáčky kompresoru* |
 
-## DŮLEŽITÉ: Zápis registrů
+*Řada TČ PRO zobrazuje výkon (W) místo otáček (rpm).
 
-**Modbus write NEFUNGUJE** - Tecomat přijímá write bez chyby, ale PLC program
-hodnotu okamžitě přepíše. Zápis funguje výhradně přes **HTTP POST** na webové
-rozhraní Tecomatu.
+## Holding registry - Write data (function code 6/16)
 
-### Formát HTTP POST zápisu
-```
-POST /PAGE49.XML HTTP/1.1
-Content-Type: application/x-www-form-urlencoded
-Cookie: SoftPLC=<session_id>
+Adresa 0-based (40001 → addr 0). Teploty: Int x10 (v HA: value * 10).
 
-__R190_REAL_.1f=22.0
-```
+| Addr | Modbus | Tag | Typ | Jednotky | Min | Max | Popis |
+|------|--------|-----|-----|----------|-----|-----|-------|
+| 0 | 40001 | T_set_indoor1 | Int x10 | °C | 100 | 300 | Žádaná teplota místnost okruh 1 |
+| 1 | 40002 | T_act_indoor1 | Int x10 | °C | 0 | 500 | Aktuální teplota místnost okruh 1** |
+| 2 | 40003 | T_set_indoor2 | Int x10 | °C | 100 | 300 | Žádaná teplota místnost okruh 2 |
+| 3 | 40004 | T_act_indoor2 | Int x10 | °C | 0 | 500 | Aktuální teplota místnost okruh 2** |
+| 4 | 40005 | T_set_TUV | Int x10 | °C | 100 | 460 | Žádaná teplota TUV |
+| 5 | 40006 | TC_set | Word | - | 0 | 65535 | Nastavení TČ (režim, kvitace) |
+| 6 | 40007 | TC_set_reg | Int | - | 0 | 2 | Typ regulace |
+| 7 | 40008 | T_set_water_back | Int x10 | °C | 100 | 650 | Žádaná teplota zpátečky (režim ST) |
+| 8 | 40009 | T_air | Int x10 | °C | -500 | 500 | Venkovní teplota** |
+| 9 | 40010 | T_act_solar | Int x10 | °C | -500 | 3000 | Teplota soláru** |
+| 10 | 40011 | T_act_pool | Int x10 | °C | 0 | 500 | Teplota bazénu** |
+| 11 | 40012 | T_set_pool | Int x10 | °C | 100 | 500 | Žádaná teplota bazénu |
+| 12 | 40013 | T_set_water_cool | Int x10 | °C | 150 | 300 | Žádaná teplota výstupu (chlazení) |
+| 13 | 40014 | Comp_rpm_max | Int | rpm | 1800 | 6000 | Max otáčky kompresoru* |
 
-### Přihlášení (nutné pro POST)
-```bash
-curl -c /tmp/cookies.txt -d "USERNAME=<ACOND_USER>&PASSWORD=<ACOND_PASS>&SUBMIT=Login" \
-  http://<ACOND_HOST>/syswww/login.xml
-```
+**Hodnota mimo rozsah → TČ použije vlastní čidlo.
+*Řada TČ PRO: Comp_capacity_max (W), rozsah 2000-20000.
 
-## Ověřené registry - Teploty (float32, swap: word) - ČTENÍ přes Modbus
+## TC_status - Stav TČ (input reg 30007, bitové pole)
 
-| Modbus reg | R-registr | Popis | Ověřená hodnota |
-|-----------|-----------|-------|-----------------|
-| 95 | R190 | **Pokojová teplota setpoint (zapisovatelný!)** | 21.5°C |
-| 3102 | R6204 | Teplota v místnosti aktuální | 22.3°C |
-| 3104 | R6208 | Teplota v místnosti efektivní požadovaná (read-only) | 21.5°C |
-| 3092 | R6184 | Teplota v místnosti 2. okruh | 32.2°C |
-| 3090 | R6180 | Teplota vody v deskovém výměníku | 35.6°C |
-| 3096 | R6192 | Teplota výstupu (kondenzátor) | 44.3°C |
-| 3098 | R6196 | Teplota (neidentifikovaná) | 24.2°C |
-| 3100 | R6200 | Venkovní teplota aktuální | 16.5°C |
-| 36 | R72 | Venkovní teplota průměrná | 8.0°C |
-| 3106 | R6212 | TUV aktuální | 41.3°C |
-| 3108 | R6216 | TUV efektivní požadovaná (read-only) | 46.0°C |
-| 385 | R770 | Konec ohřevu | 12.0°C |
-| 3110 | R6220 | Teplota (neidentifikovaná) | 0.0°C |
-| 904 | R1808 | Verze SW | 61.8 |
+| Bit | Mask | Popis |
+|-----|------|-------|
+| 0 | 0x0001 | TČ zapnuto |
+| 1 | 0x0002 | TČ chod (kompresor) |
+| 2 | 0x0004 | TČ v poruše |
+| 3 | 0x0008 | Probíhá ohřev TUV |
+| 4 | 0x0010 | Oběh. čerpadlo topný okruh 1 |
+| 5 | 0x0020 | Oběh. čerpadlo topný okruh 2 |
+| 6 | 0x0040 | Oběh. čerpadlo soláru |
+| 7 | 0x0080 | Oběh. čerpadlo bazénu |
+| 8 | 0x0100 | Odmrazení |
+| 9 | 0x0200 | Bivalence chod |
+| 10 | 0x0400 | Letní provoz |
+| 11 | 0x0800 | Oběh. čerpadlo solanka |
+| 12 | 0x1000 | Chlazení chod |
+| 13-15 | - | Rezerva |
 
-## Zapisovatelné registry - přes HTTP POST
+## TC_set - Nastavení TČ (holding reg 40006, bitové pole)
 
-| R-registr | Typ | POST body | Popis | Stránka |
-|-----------|-----|-----------|-------|---------|
-| R190 | REAL | `__R190_REAL_.1f=<val>` | Pokojová teplota setpoint 1. okruh | PAGE49.XML |
-| R815 | REAL | `__R815_REAL_.1f=<val>` | TUV setpoint | PAGE49.XML |
-| R770 | REAL | `__R770_REAL_.1f=<val>` | Konec ohřevu | PAGE49.XML |
-| R805.4 | BOOL | `__R805.4_BOOL_i=0/1` | Časový plán TUV povolen | PAGE49.XML |
-| R805.1 | BOOL | `__R805.1_BOOL_i=0/1` | Útlum ventilátoru | PAGE49.XML |
-| R870.0-7 | BOOL | `__R870.x_BOOL_i=0/1` | Režim regulace/provozu | PAGE49.XML |
+| Bit | Mask | Popis |
+|-----|------|-------|
+| 0 | 0x0001 | Režim automatický |
+| 1 | 0x0002 | Režim pouze TČ |
+| 2 | 0x0004 | Režim bivalence |
+| 3 | 0x0008 | Režim vypnuto |
+| 4 | 0x0010 | Režim chlazení |
+| 5 | 0x0020 | Kvitace poruchy |
+| 6 | 0x0040 | Solár on |
+| 7 | 0x0080 | Bazén on |
+| 8 | 0x0100 | Přepnutí léto/zima |
 
-## Ověřené registry - Status (uint16)
+## Číselník rezim_pan (input reg 30014)
 
-| Modbus reg | R-registr | Byte | Popis |
-|-----------|-----------|------|-------|
-| 435 | R870/R871 | low | Regulace a režim (bitové pole) |
-| 344 | R688/R689 | low | Provozní stav |
-| 402 | R804/R805 | high | Příslušenství a funkce |
+| Hodnota | Popis |
+|---------|-------|
+| 0 | Automatický režim |
+| 1 | Jen tepelné čerpadlo |
+| 2 | Nepoužito |
+| 3 | Jen bivalence |
+| 4 | Vypnuto |
+| 5 | Režim manual |
+| 6 | Režim chlazení |
 
-### R870 - Regulace a režim (low byte of reg 435)
+## Číselník typ_reg_pan (input reg 30015)
 
-| Bit | Hodnota | Popis |
-|-----|---------|-------|
-| 0 | 1 | AT - Regulace Acond Therm |
-| 1 | 0 | EKV - Ekvitermní regulace |
-| 2 | 0 | ST - Ruční zadání |
-| 3 | 1 | AUT - Režim automatický |
-| 4 | 0 | TČ - Režim pouze tepelné čerpadlo |
-| 6 | 0 | BIV - Režim bivalence |
-| 7 | 0 | VYP - Režim vypnuto |
+| Hodnota | Popis |
+|---------|-------|
+| 0 | AcondTherm |
+| 1 | Ekviterm |
+| 2 | Standard (ručně) |
 
-### R688 - Provozní stav (low byte of reg 344)
+## Data MIMO Modbus protokol (čtení přes HTTP web rozhraní)
 
-| Bit | Popis |
-|-----|-------|
-| 0 | Ohřev TUV |
-| 1 | Bivalence 1 |
+Následující data Modbus protokol v2.34 neposkytuje:
+- **HDO blokace** (X12.1) - fyzický vstup PLC
+- **Alarm text** (R6513 string) - ale máme err_number kódy
+- **TUV časový plán** (R805.4) - ovládání zapnutí/vypnutí plánu
+- **Útlum ventilátoru** (R805.1)
+- **Ekviterm křivka** (R148-R176)
 
-### R805 - Příslušenství (HIGH byte of reg 402)
-
-Tecomat čísluje bity od 1 (R805.1 = bit index 0 v high byte).
-
-| R805.x | Bit index | Mask | Popis |
-|--------|-----------|------|-------|
-| R805.1 | 0 | 0x01 | Útlum ventilátoru |
-| R805.2 | 1 | 0x02 | Bivalence aktivní |
-| R805.3 | 2 | 0x04 | Antisepse povolena |
-| R805.4 | 3 | 0x08 | **Časový plán TUV povolen** |
-
-## Fyzické výstupy (Y-zone)
-
-| Adresa | Popis | Stav |
-|--------|-------|------|
-| Y2.0 | (výstup 0) | 0 |
-| Y2.1 | (výstup 1) | 0 |
-| Y2.2 | (výstup 2) | 0 |
-| Y2.4 | (výstup 4) | 0 |
-| Y2.5 | (výstup 5) | 0 |
-| Y2.6 | (výstup 6) | 0 |
-| Y2.7 | (výstup 7) | 0 |
-| Y3.0 | (výstup 8) | 0 |
-
-## Časové plány TUV (R556-R664)
-
-| R-registr | Typ | Popis |
-|-----------|-----|-------|
-| R556-R568 | TIME | Neděle okno 1+2 (OD/DO) |
-| R572-R584 | TIME | Pondělí okno 1+2 |
-| R588-R600 | TIME | Úterý okno 1+2 |
-| R604-R616 | TIME | Středa okno 1+2 |
-| R620-R632 | TIME | Čtvrtek okno 1+2 |
-| R636-R648 | TIME | Pátek okno 1+2 |
-| R652-R664 | TIME | Sobota okno 1+2 |
-
-Aktuální plán: 00:00-04:00 a 13:00-15:00 každý den.
-
-## Časové plány 2. okruh (R2196-R2304)
-
-2\. okruh má časový plán ale **nemá osazené pokojové čidlo**.
-Regulace jde pouze podle ekviterm křivky.
-
-## Ekviterm křivka (float32, swap: word)
-
-| Modbus reg | R-registr | Popis | Hodnota |
-|-----------|-----------|-------|---------|
-| 74 | R148 | Teplota topné vody při -20°C | 55.0°C |
-| 76 | R152 | Teplota topné vody při -8°C | 45.0°C |
-| 78 | R156 | Teplota topné vody při 5°C | 35.0°C |
-| 80 | R160 | Teplota topné vody při 15°C | 25.0°C |
-| 82 | R164 | Venkovní teplota bod 1 | -20.0°C |
-| 84 | R168 | Venkovní teplota bod 2 | -8.0°C |
-| 86 | R172 | Venkovní teplota bod 3 | 5.0°C |
-| 88 | R176 | Venkovní teplota bod 4 | 15.0°C |
-| 72 | R144 | Maximální teplota | 25.0°C |
-
-## Příkazy pro mbpoll (pouze čtení)
+## Příkazy pro testování
 
 ```bash
-# Čtení float hodnoty
-mbpoll -a 1 -t 4:float -0 -r 3102 -c 1 -1 <ACOND_HOST>
+# Čtení input registrů (teploty, addr 0-5)
+mbpoll -a 1 -t 3 -r 1 -c 6 -1 <ACOND_HOST>
 
-# Čtení 16-bit hex (pro status registry)
-mbpoll -a 1 -t 4:hex -0 -r 435 -c 1 -1 <ACOND_HOST>
+# Čtení TC_status (addr 6)
+mbpoll -a 1 -t 3:hex -r 7 -c 1 -1 <ACOND_HOST>
 
-# Čtení bloku teplot (R6180-R6240)
-mbpoll -a 1 -t 4:float -0 -r 3090 -c 16 -1 <ACOND_HOST>
+# Čtení režimu a regulace (addr 13-14)
+mbpoll -a 1 -t 3 -r 14 -c 2 -1 <ACOND_HOST>
+
+# Čtení chybových kódů (addr 20-22)
+mbpoll -a 1 -t 3 -r 21 -c 3 -1 <ACOND_HOST>
+
+# Zápis pokojové teploty 21.5°C (holding reg 40001, addr 0, hodnota 215)
+mbpoll -a 1 -t 4 -r 1 -1 <ACOND_HOST> 215
+
+# Zápis TUV 46°C (holding reg 40005, addr 4, hodnota 460)
+mbpoll -a 1 -t 4 -r 5 -1 <ACOND_HOST> 460
+
+# Kvitace alarmu (holding reg 40006, addr 5, bit 5 = 32)
+mbpoll -a 1 -t 4 -r 6 -1 <ACOND_HOST> 32
 ```
-
-## Příkazy pro curl (zápis)
-
-```bash
-# Login
-curl -c /tmp/c.txt -d "USERNAME=<ACOND_USER>&PASSWORD=<ACOND_PASS>&SUBMIT=Login" \
-  http://<ACOND_HOST>/syswww/login.xml
-
-# Nastavení pokojové teploty
-curl -b /tmp/c.txt -d "__R190_REAL_.1f=22.0" \
-  -H "Content-Type: application/x-www-form-urlencoded" \
-  http://<ACOND_HOST>/PAGE49.XML
-
-# Vypnutí TUV plánu (jednorázový ohřev)
-curl -b /tmp/c.txt -d "__R805.4_BOOL_i=0" \
-  -H "Content-Type: application/x-www-form-urlencoded" \
-  http://<ACOND_HOST>/PAGE49.XML
-
-# Zapnutí TUV plánu zpět
-curl -b /tmp/c.txt -d "__R805.4_BOOL_i=1" \
-  -H "Content-Type: application/x-www-form-urlencoded" \
-  http://<ACOND_HOST>/PAGE49.XML
-```
-
-## Poznámky k existujícím HA pluginům
-
-Komunita HA (JH-Soft-Technology/acond-heat-card) používá registry 0-40 s int16
-a scale 0.1. Toto mapování je pro **jiný typ řídící jednotky** (ne Tecomat Foxtrot).
-Tento TČ 12 Monoblok EVI-M s Tecomat Foxtrot používá float32 na zcela jiných
-adresách a zápis vyžaduje HTTP POST místo Modbus write.

@@ -1,5 +1,6 @@
 # =============================================================================
 # Acond TČ - Input number entity pro nastavení teplot
+# Rozsahy dle Modbus protokolu v2.34
 # Přidej do configuration.yaml:
 #   input_number: !include input_number_acond.yaml
 # =============================================================================
@@ -13,10 +14,19 @@ acond_room_temp_target:
   icon: mdi:thermometer
   mode: slider
 
+acond_room_temp_2_target:
+  name: "Acond Požadovaná teplota místnost 2"
+  min: 15
+  max: 28
+  step: 0.5
+  unit_of_measurement: "°C"
+  icon: mdi:thermometer
+  mode: slider
+
 acond_dhw_temp_target:
   name: "Acond Požadovaná teplota TUV"
   min: 30
-  max: 60
+  max: 46
   step: 1
   unit_of_measurement: "°C"
   icon: mdi:water-boiler

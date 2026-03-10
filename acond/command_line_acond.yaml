@@ -1,17 +1,29 @@
 # =============================================================================
-# Acond TČ - Command line senzory (čtení dat z web rozhraní)
-# Používá wrapper skript acond_read.sh (credentials v acond_config.sh)
+# Acond TČ - Command line senzory (data nedostupná přes Modbus protokol)
 # =============================================================================
+#
+# Hodnoty z web rozhraní Tecomat Foxtrot. Poller skript (acond_web_poller.sh)
+# se přihlásí jedním TCP spojením, přečte vše a uloží do JSON.
+# Senzory čtou z lokálního /tmp/acond_web_state.json → žádné extra TCP.
 #
 # Přidej do configuration.yaml:
 #   command_line: !include command_line_acond.yaml
 # =============================================================================
 
-# --- Text chyby/alarmu z web rozhraní ---
+# --- Poller: spouští se každých 5 minut, aktualizuje JSON ---
 - sensor:
-    name: "Acond Alarm text"
-    unique_id: acond_alarm_text
-    command: /config/scripts/acond_read.sh PAGE49.XML 's/.*R6513_STRING\[80\]_s" VALUE="\([^"]*\)".*/\1/p'
-    command_timeout: 10
+    name: "Acond Web Poller"
+    unique_id: acond_web_poller
+    command: /config/scripts/acond_web_poller.sh && cat /tmp/acond_web_state.json
+    command_timeout: 15
     scan_interval: 300
-    value_template: "{{ value if value else 'OK' }}"
+    value_template: "{{ value_json.timestamp | default('error') }}"
+    json_attributes:
+      - hdo_block
+      - tuv_schedule
+      - tuv_heating_enabled
+      - heating_schedule
+      - night_setback
+      - temp_output
+      - night_from
+      - night_to

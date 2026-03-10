@@ -38,8 +38,9 @@ ssh root@${HA_HOST} "mkdir -p ${HA_CONFIG}/scripts"
 scp -q \
   "${SCRIPT_DIR}/scripts/acond_write.sh" \
   "${SCRIPT_DIR}/scripts/acond_read.sh" \
+  "${SCRIPT_DIR}/scripts/acond_web_poller.sh" \
   root@${HA_HOST}:${HA_CONFIG}/scripts/
-ssh root@${HA_HOST} "chmod +x ${HA_CONFIG}/scripts/acond_write.sh ${HA_CONFIG}/scripts/acond_read.sh"
+ssh root@${HA_HOST} "chmod +x ${HA_CONFIG}/scripts/acond_write.sh ${HA_CONFIG}/scripts/acond_read.sh ${HA_CONFIG}/scripts/acond_web_poller.sh"
 
 # Check if config file exists on HA, warn if not
 if ! ssh root@${HA_HOST} "test -f ${HA_CONFIG}/scripts/acond_config.sh"; then
@@ -62,7 +63,7 @@ fi
 
 # Validate configuration
 echo "Validating HA configuration..."
-if ssh root@${HA_HOST} "ha core check" 2>&1 | grep -q "valid"; then
+if ssh root@${HA_HOST} "ha core check" 2>&1 | grep -q "completed successfully"; then
   echo "Configuration valid!"
   echo ""
   read -p "Restart Home Assistant? [y/N] " -n 1 -r

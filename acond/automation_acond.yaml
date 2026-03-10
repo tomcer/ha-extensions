@@ -1,5 +1,6 @@
 # =============================================================================
 # Acond TČ - Automatizace pro ovládání
+# Firmware: ModbusTCP v2.34+ (zápis teplot přes Modbus, TUV plán přes HTTP)
 # Přidej do configuration.yaml:
 #   automation: !include automation_acond.yaml
 # =============================================================================
@@ -11,17 +12,17 @@
     - platform: homeassistant
       event: start
     - platform: state
-      entity_id: sensor.acond_pokojova_teplota_setpoint
+      entity_id: sensor.acond_teplota_v_mistnosti_pozadovana
   condition:
     - condition: template
       value_template: >
-        {{ states('sensor.acond_pokojova_teplota_setpoint') not in ['unknown', 'unavailable'] }}
+        {{ states('sensor.acond_teplota_v_mistnosti_pozadovana') not in ['unknown', 'unavailable'] }}
   action:
     - service: input_number.set_value
       target:
         entity_id: input_number.acond_room_temp_target
       data:
-        value: "{{ states('sensor.acond_pokojova_teplota_setpoint') | float }}"
+        value: "{{ states('sensor.acond_teplota_v_mistnosti_pozadovana') | float }}"
 
 - id: acond_sync_dhw_temp_slider
   alias: "Acond - Sync TUV teplota slider"
@@ -41,7 +42,26 @@
       data:
         value: "{{ states('sensor.acond_tuv_pozadovana') | float }}"
 
-# --- Odeslání nové pokojové teploty do TČ ---
+# --- Synchronizace input_number okruh 2 s aktuální hodnotou z Modbusu ---
+- id: acond_sync_room_temp_2_slider
+  alias: "Acond - Sync pokojová teplota 2 slider"
+  trigger:
+    - platform: homeassistant
+      event: start
+    - platform: state
+      entity_id: sensor.acond_teplota_mistnost_2_pozadovana
+  condition:
+    - condition: template
+      value_template: >
+        {{ states('sensor.acond_teplota_mistnost_2_pozadovana') not in ['unknown', 'unavailable'] }}
+  action:
+    - service: input_number.set_value
+      target:
+        entity_id: input_number.acond_room_temp_2_target
+      data:
+        value: "{{ states('sensor.acond_teplota_mistnost_2_pozadovana') | float }}"
+
+# --- Odeslání nové pokojové teploty do TČ přes Modbus ---
 - id: acond_set_room_temp
   alias: "Acond - Nastavit pokojovou teplotu"
   trigger:
@@ -52,11 +72,32 @@
       value_template: >
         {{ trigger.from_state.state not in ['unknown', 'unavailable'] }}
   action:
-    - service: shell_command.acond_set_room_temp
+    - service: modbus.write_register
       data:
-        temperature: "{{ states('input_number.acond_room_temp_target') }}"
+        hub: acond
+        slave: 2
+        address: 0
+        value: "{{ (states('input_number.acond_room_temp_target') | float * 10) | int }}"
 
-# --- Odeslání nové TUV teploty do TČ ---
+# --- Odeslání nové pokojové teploty okruh 2 do TČ přes Modbus ---
+- id: acond_set_room_temp_2
+  alias: "Acond - Nastavit pokojovou teplotu okruh 2"
+  trigger:
+    - platform: state
+      entity_id: input_number.acond_room_temp_2_target
+  condition:
+    - condition: template
+      value_template: >
+        {{ trigger.from_state.state not in ['unknown', 'unavailable'] }}
+  action:
+    - service: modbus.write_register
+      data:
+        hub: acond
+        slave: 2
+        address: 2
+        value: "{{ (states('input_number.acond_room_temp_2_target') | float * 10) | int }}"
+
+# --- Odeslání nové TUV teploty do TČ přes Modbus ---
 - id: acond_set_dhw_temp
   alias: "Acond - Nastavit TUV teplotu"
   trigger:
@@ -67,11 +108,14 @@
       value_template: >
         {{ trigger.from_state.state not in ['unknown', 'unavailable'] }}
   action:
-    - service: shell_command.acond_set_dhw_temp
+    - service: modbus.write_register
       data:
-        temperature: "{{ states('input_number.acond_dhw_temp_target') }}"
+        hub: acond
+        slave: 2
+        address: 4
+        value: "{{ (states('input_number.acond_dhw_temp_target') | float * 10) | int }}"
 
-# --- Jednorázový ohřev TUV (vypne plán, po 2h zapne zpět) ---
+# --- Jednorázový ohřev TUV (vypne časový plán → TČ ohřeje hned → zapne zpět) ---
 - id: acond_dhw_boost
   alias: "Acond - Jednorázový ohřev TUV"
   trigger:
@@ -79,15 +123,19 @@
       entity_id: input_boolean.acond_dhw_boost
       to: "on"
   action:
+    # Vypneme TUV časový plán přes HTTP POST (není v Modbus protokolu)
     - service: shell_command.acond_dhw_schedule_off
+    # Počkáme až TČ začne ohřívat TUV (TC_status bit 3)
     - wait_template: >
         {{ is_state('binary_sensor.acond_ohrev_tuv', 'on') }}
-      timeout: "00:05:00"
+      timeout: "00:10:00"
       continue_on_timeout: true
+    # Počkáme až ohřev skončí
     - wait_template: >
         {{ is_state('binary_sensor.acond_ohrev_tuv', 'off') }}
       timeout: "02:00:00"
       continue_on_timeout: true
+    # Zapneme TUV plán zpět
     - service: shell_command.acond_dhw_schedule_on
     - service: input_boolean.turn_off
       target:
@@ -103,11 +151,38 @@
   action:
     - service: shell_command.acond_dhw_schedule_on
 
-# --- Kvitace alarmu ---
+# --- Posílání teploty ze Zigbee senzoru do TČ jako T_act_indoor2 ---
+# Holding reg 40004 (addr 3) = aktuální teplota místnosti okruh 2
+# Write FC6 ověřen testem - holding[3] přijímá hodnotu, TČ ji použije místo čidla
+- id: acond_send_indoor2_temp
+  alias: "Acond - Poslat teplotu okruh 2 (ZB→TČ)"
+  trigger:
+    - platform: state
+      entity_id: sensor.temp_okruh_2_temperature
+    - platform: time_pattern
+      minutes: "/5"
+  condition:
+    - condition: template
+      value_template: >
+        {{ states('sensor.temp_okruh_2_temperature') not in ['unknown', 'unavailable'] }}
+  action:
+    - service: modbus.write_register
+      data:
+        hub: acond
+        slave: 2
+        address: 3
+        value: "{{ (states('sensor.temp_okruh_2_temperature') | float * 10) | int }}"
+
+# --- Kvitace alarmu (TC_set bit 5 = 32, holding reg 40006, addr 5) ---
 - id: acond_alarm_acknowledge
   alias: "Acond - Kvitace alarmu"
   trigger:
     - platform: state
       entity_id: input_button.acond_alarm_ack
   action:
-    - service: shell_command.acond_alarm_acknowledge
+    - service: modbus.write_register
+      data:
+        hub: acond
+        slave: 2
+        address: 5
+        value: 32

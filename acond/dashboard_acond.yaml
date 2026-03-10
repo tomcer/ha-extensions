@@ -1,0 +1,199 @@
+# =============================================================================
+# Acond TČ - Dashboard (Lovelace)
+# =============================================================================
+
+views:
+  - title: Tepelné čerpadlo
+    icon: mdi:heat-pump
+    path: tc
+    type: panel
+    cards:
+      - type: vertical-stack
+        cards:
+
+          # =====================================================================
+          # STAVOVÁ LIŠTA
+          # =====================================================================
+          - type: horizontal-stack
+            cards:
+              - type: entity
+                entity: sensor.acond_rezim_provozu
+                name: Režim
+                icon: mdi:heat-pump
+              - type: entity
+                entity: sensor.acond_venkovni_teplota
+                name: Venku
+                icon: mdi:thermometer
+              - type: entity
+                entity: sensor.acond_teplota_vystup
+                name: Výstup
+                icon: mdi:thermometer-chevron-up
+              - type: entity
+                entity: sensor.acond_teplota_zpatecky
+                name: Zpátečka
+                icon: mdi:thermometer-chevron-down
+
+          # =====================================================================
+          # IKONY STAVU - plná šířka
+          # =====================================================================
+          - type: glance
+            show_name: true
+            show_state: false
+            columns: 8
+            entities:
+              - entity: binary_sensor.acond_tc_zapnuto
+                name: "ON"
+              - entity: binary_sensor.acond_tc_v_chodu
+                name: Kompresor
+              - entity: binary_sensor.acond_porucha
+                name: Porucha
+              - entity: binary_sensor.acond_ohrev_tuv
+                name: TUV
+              - entity: binary_sensor.acond_obeh_cerpadlo_okruh_1
+                name: Čerp.1
+              - entity: binary_sensor.acond_obeh_cerpadlo_okruh_2
+                name: Čerp.2
+              - entity: binary_sensor.acond_odmrazeni
+                name: Odmraz.
+              - entity: binary_sensor.acond_hdo_blokace
+                name: HDO
+
+          # =====================================================================
+          # TŘI OKRUHY vedle sebe
+          # =====================================================================
+          - type: horizontal-stack
+            cards:
+
+              # --- OKRUH 1 ---
+              - type: vertical-stack
+                cards:
+                  - type: gauge
+                    entity: sensor.acond_teplota_v_mistnosti
+                    name: "Okruh 1 — Místnost"
+                    min: 15
+                    max: 30
+                    needle: true
+                    segments:
+                      - from: 15
+                        color: "#2196F3"
+                      - from: 19
+                        color: "#4CAF50"
+                      - from: 24
+                        color: "#FF9800"
+                      - from: 27
+                        color: "#F44336"
+                  - type: entities
+                    entities:
+                      - entity: sensor.acond_teplota_v_mistnosti_pozadovana
+                        name: Požadovaná
+                        icon: mdi:target
+                      - entity: input_number.acond_room_temp_target
+                        name: Nastavit
+                      - entity: binary_sensor.acond_obeh_cerpadlo_okruh_1
+                        name: Čerpadlo
+                      - entity: binary_sensor.acond_topeni_plan
+                        name: Plán topení
+
+              # --- OKRUH 2 ---
+              - type: vertical-stack
+                cards:
+                  - type: gauge
+                    entity: sensor.temp_okruh_2_temperature
+                    name: "Okruh 2 — Zigbee"
+                    min: 15
+                    max: 30
+                    needle: true
+                    segments:
+                      - from: 15
+                        color: "#2196F3"
+                      - from: 19
+                        color: "#4CAF50"
+                      - from: 24
+                        color: "#FF9800"
+                      - from: 27
+                        color: "#F44336"
+                  - type: entities
+                    entities:
+                      - entity: sensor.acond_teplota_mistnost_2_pozadovana
+                        name: Požadovaná
+                        icon: mdi:target
+                      - entity: input_number.acond_room_temp_2_target
+                        name: Nastavit
+                      - entity: binary_sensor.acond_obeh_cerpadlo_okruh_2
+                        name: Čerpadlo
+                      - entity: sensor.temp_okruh_2_humidity
+                        name: Vlhkost
+
+              # --- TUV ---
+              - type: vertical-stack
+                cards:
+                  - type: gauge
+                    entity: sensor.acond_tuv_aktualni
+                    name: TUV
+                    min: 20
+                    max: 60
+                    needle: true
+                    segments:
+                      - from: 20
+                        color: "#2196F3"
+                      - from: 35
+                        color: "#4CAF50"
+                      - from: 45
+                        color: "#FF9800"
+                      - from: 55
+                        color: "#F44336"
+                  - type: entities
+                    entities:
+                      - entity: sensor.acond_tuv_pozadovana
+                        name: Požadovaná
+                        icon: mdi:target
+                      - entity: input_number.acond_dhw_temp_target
+                        name: Nastavit
+                      - entity: binary_sensor.acond_ohrev_tuv
+                        name: Ohřev aktivní
+                      - entity: binary_sensor.acond_tuv_plan
+                        name: Časový plán
+                      - entity: input_boolean.acond_dhw_boost
+                        name: Boost
+
+          # =====================================================================
+          # SPODNÍ ŘADA - Signály + Diagnostika
+          # =====================================================================
+          - type: horizontal-stack
+            cards:
+              - type: entities
+                title: Signály
+                show_header_toggle: false
+                entities:
+                  - entity: binary_sensor.acond_nocni_utlum
+                    name: Noční útlum
+                  - entity: binary_sensor.acond_letni_provoz
+                    name: Letní provoz
+                  - entity: binary_sensor.acond_bivalence_aktivni
+                    name: Bivalence
+                  - entity: sensor.acond_teplota_zpatecky_pozadovana
+                    name: Zpátečka pož.
+
+              - type: entities
+                title: Diagnostika
+                show_header_toggle: false
+                entities:
+                  - entity: sensor.acond_heartbeat
+                    name: Heartbeat
+                  - entity: sensor.acond_status_tc_raw
+                    name: TC_status raw
+                  - entity: binary_sensor.acond_alarm
+                    name: Alarm
+                  - entity: input_button.acond_alarm_ack
+                    name: Kvitace alarmu
+
+              - type: entities
+                title: Zařízení
+                show_header_toggle: false
+                entities:
+                  - entity: sensor.temp_okruh_2_battery
+                    name: ZB baterie
+                  - entity: sensor.acond_web_poller
+                    name: Web poller
+                  - entity: sensor.acond_typ_regulace
+                    name: Regulace
